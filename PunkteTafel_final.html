@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KI-lienduell Punktetafel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e6e364;
+            font-family: 'Press Start 2P', cursive;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .container {
+            border: 4px solid #444;
+            padding: 30px;
+            background-color: #222;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            width: 90%;
+            max-width: 800px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 40px;
+            letter-spacing: 2px;
+            outline: none; /* Entfernt den Standard-Fokusrahmen bei contenteditable */
+            cursor: text; /* Zeigt an, dass es bearbeitbar ist */
+            padding: 5px 10px;
+            border-bottom: 2px dashed transparent; /* Subtiler Hinweis auf Bearbeitbarkeit */
+        }
+        h1:focus {
+            border-bottom-color: #e6e364; /* Rahmen beim Bearbeiten */
+        }
+
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-start;
+            margin-bottom: 40px;
+            gap: 20px;
+            flex-direction: row;
+        }
+
+        .team {
+            padding: 20px;
+            border: 2px solid #444;
+            background-color: #333;
+            width: 45%;
+            transition: transform 0.1s ease-out;
+        }
+
+        .team h2 {
+            font-size: 1.5em;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .team .score {
+            font-size: 3em;
+            font-weight: bold;
+            padding: 10px;
+            display: inline-block;
+            transition: transform 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+
+        .team-gelb h2 { color: #ffff00; }
+        .team-blau h2 { color: #6495ed; }
+
+        .score-pulse {
+            transform: scale(1.3);
+            color: #fff !important;
+        }
+
+        .winner-display {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .winner-display h3 {
+            font-size: 2em;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .winner-display .winner-name {
+            font-size: 4em;
+            color: #e6e364;
+            padding: 20px;
+            border: 3px dashed #e6e364;
+            animation: blink-border 1.5s infinite;
+        }
+
+        @keyframes blink-border {
+            0%, 100% { border-color: #e6e364; }
+            50% { border-color: #333; }
+        }
+
+        .instructions {
+            margin-top: 30px;
+            font-size: 0.8em;
+            color: #888;
+            display: none; /* Standardmäßig ausgeblendet */
+        }
+        .instructions p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 contenteditable="true" id="game-title">Spiel 1</h1>
+
+        <div class="scoreboard" id="scoreboard">
+            <div class="team team-gelb" id="team-gelb-container">
+                <h2>Team Gelb</h2>
+                <div class="score" id="score-gelb">0</div>
+            </div>
+            <div class="team team-blau" id="team-blau-container">
+                <h2>Team Blau</h2>
+                <div class="score" id="score-blau">0</div>
+            </div>
+        </div>
+
+        <div class="instructions" id="instructions">
+            <p>Steuerung:</p>
+            <p>(Titel oben ist editierbar)</p>
+            <p>'ä' = Punkt für Team Gelb</p>
+            <p>'a' = Punkt für Team Blau</p>
+            <p>'SHIFT + ä' = Punkt Abzug Team Gelb</p>
+            <p>'SHIFT + a' = Punkt Abzug Team Blau</p>
+            <p>'z' = Gewinner anzeigen (+ Victory Sound)</p>
+            <p>'r' = Team-Positionen tauschen</p>
+            <p>'h' = Diese Hilfe ein-/ausblenden</p>
+            <p>'9' = "Richtig"-Sound (sequenziell)</p>
+            <p>'0' = "Falsch"-Sound (sequenziell)</p>
+            <p>'l' = "Leise"-Sound (sequenziell) -> jetzt auch Leertaste</p>
+            <p>'LEERTASTE' = "Leise"-Sound (sequenziell)</p>
+            <p>'f' = Vollbildmodus umschalten</p>
+            <p>(Klicke auf Gewinneranzeige zum Schließen)</p>
+        </div>
+    </div>
+
+    <div class="winner-display" id="winner-popup">
+        <h3>Gewonnen hat:</h3>
+        <div class="winner-name" id="winning-team-name"></div>
+    </div>
+
+    <script>
+        let scoreGelb = 0;
+        let scoreBlau = 0;
+
+        const scoreGelbDisplay = document.getElementById('score-gelb');
+        const scoreBlauDisplay = document.getElementById('score-blau');
+        const winnerPopup = document.getElementById('winner-popup');
+        const winningTeamNameDisplay = document.getElementById('winning-team-name');
+        const instructionsDisplay = document.getElementById('instructions');
+        const scoreboardContainer = document.getElementById('scoreboard');
+        const gameTitleElement = document.getElementById('game-title');
+
+        // --- Sound-Konfiguration ---
+        const soundsBasePath = 'sounds/';
+        const NUM_RIGHT_SOUNDS = 29;
+        const NUM_WRONG_SOUNDS = 26;
+        const NUM_VICTORY_SOUNDS = 3;
+        const NUM_LEISE_SOUNDS = 10;
+        const SOUND_FILE_EXTENSION = '.mp3';
+
+        // Zähler für sequenzielles Abspielen
+        let soundCounters = {
+            right: 1,
+            wrong: 1,
+            victory: 1,
+            leise: 1
+        };
+
+        function padNumber(num, size) {
+            num = num.toString();
+            while (num.length < size) num = "0" + num;
+            return num;
+        }
+
+        function playSequentialSound(soundType) {
+            let currentCounter = soundCounters[soundType];
+            let totalCount;
+            let filenamePrefix = soundType; // Standard-Präfix ist der soundType
+
+            if (soundType === 'right') {
+                totalCount = NUM_RIGHT_SOUNDS;
+                filenamePrefix = 'richtig'; // Spezielles Präfix für 'right'
+            } else if (soundType === 'wrong') {
+                totalCount = NUM_WRONG_SOUNDS;
+            } else if (soundType === 'victory') {
+                totalCount = NUM_VICTORY_SOUNDS;
+            } else if (soundType === 'leise') {
+                totalCount = NUM_LEISE_SOUNDS;
+            } else {
+                console.warn(`Unbekannter Sound-Typ: ${soundType}`);
+                return;
+            }
+
+            if (totalCount === 0) {
+                console.warn(`Keine Sounds für Typ "${soundType}" konfiguriert.`);
+                return;
+            }
+
+            const soundNumberPadded = padNumber(currentCounter, 5);
+            const soundFile = `${filenamePrefix}_${soundNumberPadded}${SOUND_FILE_EXTENSION}`;
+            // Der Ordnername (soundType) bleibt gleich, z.B. 'sounds/right/richtig_00001.mp3'
+            const audioPath = `${soundsBasePath}${soundType}/${soundFile}`;
+            
+            console.log(`Playing sound (${soundType}): ${audioPath} (Counter: ${currentCounter})`);
+
+            const audio = new Audio(audioPath);
+            audio.play().catch(error => {
+                console.error(`Fehler beim Abspielen von ${audioPath}:`, error);
+            });
+
+            // Zähler für den nächsten Aufruf aktualisieren
+            soundCounters[soundType]++;
+            if (soundCounters[soundType] > totalCount) {
+                soundCounters[soundType] = 1; // Zurücksetzen auf 1
+            }
+        }
+
+
+        function animateScore(element) {
+            element.classList.add('score-pulse');
+            setTimeout(() => {
+                element.classList.remove('score-pulse');
+            }, 200);
+        }
+
+        function toggleFullscreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement && !document.mozFullScreenElement &&
+                !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                if (elem.requestFullscreen) elem.requestFullscreen();
+                else if (elem.mozRequestFullScreen) elem.mozRequestFullScreen();
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+                else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (document.activeElement === gameTitleElement && event.key !== "Enter" && event.key !== "Escape") {
+                return;
+            }
+            if (event.key === "Enter" && document.activeElement === gameTitleElement) {
+                gameTitleElement.blur();
+                event.preventDefault();
+                return;
+            }
+            if (event.key === "Escape" && document.activeElement === gameTitleElement) {
+                gameTitleElement.blur();
+                return;
+            }
+
+            if (winnerPopup.style.display === 'flex' && event.key !== 'Escape') {
+                return;
+            }
+
+            const key = event.key.toLowerCase();
+
+            if (key === 'ä') {
+                if (event.shiftKey) {
+                    if (scoreGelb > 0) scoreGelb--;
+                } else {
+                    scoreGelb++;
+                }
+                scoreGelbDisplay.textContent = scoreGelb;
+                animateScore(scoreGelbDisplay);
+            } else if (key === 'a') {
+                if (event.shiftKey) {
+                    if (scoreBlau > 0) scoreBlau--;
+                } else {
+                    scoreBlau++;
+                }
+                scoreBlauDisplay.textContent = scoreBlau;
+                animateScore(scoreBlauDisplay);
+            } else if (key === 'z') {
+                playSequentialSound('victory');
+                showWinner();
+            } else if (key === 'h') {
+                instructionsDisplay.style.display = (instructionsDisplay.style.display === 'none' || instructionsDisplay.style.display === '') ? 'block' : 'none';
+            } else if (key === 'r') {
+                scoreboardContainer.style.flexDirection = (scoreboardContainer.style.flexDirection === 'row-reverse') ? 'row' : 'row-reverse';
+            } else if (key === '9') {
+                playSequentialSound('right');
+            } else if (key === '0') {
+                playSequentialSound('wrong');
+            } else if (key === 'l' || event.key === ' ') { // Taste 'l' ODER Leertaste
+                playSequentialSound('leise');
+                if (event.key === ' ') { // Verhindere Standardaktion der Leertaste (z.B. Scrollen)
+                    event.preventDefault();
+                }
+            } else if (key === 'f') {
+                toggleFullscreen();
+            }
+        });
+
+        function showWinner() {
+            let winnerText = "";
+            let winnerMessage = "Gewonnen hat:";
+
+            if (scoreGelb > scoreBlau) {
+                winnerText = "Team Gelb";
+                winningTeamNameDisplay.style.color = "#ffff00";
+                winningTeamNameDisplay.style.borderColor = "#ffff00";
+            } else if (scoreBlau > scoreGelb) {
+                winnerText = "Team Blau";
+                winningTeamNameDisplay.style.color = "#6495ed";
+                winningTeamNameDisplay.style.borderColor = "#6495ed";
+            } else {
+                winnerText = "Niemand (Unentschieden!)";
+                winnerMessage = "Ergebnis:";
+                winningTeamNameDisplay.style.color = "#e6e364";
+                winningTeamNameDisplay.style.borderColor = "#e6e364";
+            }
+
+            document.querySelector('#winner-popup h3').textContent = winnerMessage;
+            winningTeamNameDisplay.textContent = winnerText;
+            winnerPopup.style.display = 'flex';
+        }
+
+        winnerPopup.addEventListener('click', function() {
+            winnerPopup.style.display = 'none';
+        });
+
+    </script>
+</body>
+</html>
