@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soundboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h1 {
+            color: #e6e364;
+            margin-bottom: 30px;
+        }
+
+        .soundboard-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap; /* Falls nicht genug Platz für Spalten nebeneinander ist */
+            gap: 20px;
+        }
+
+        .column {
+            background-color: #222;
+            border: 3px solid #444;
+            padding: 15px;
+            border-radius: 8px;
+            min-width: 250px; /* Mindestbreite für Spalten */
+            flex: 1; /* Spalten teilen sich den verfügbaren Platz */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Buttons zentrieren, falls sie nicht volle Breite haben */
+        }
+
+        .column h2 {
+            color: #e6e364;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            border-bottom: 2px dashed #555;
+            padding-bottom: 10px;
+            width: 100%;
+        }
+        
+        /* Spezifische Farben für Spaltenüberschriften, falls gewünscht */
+        #right-sounds h2 { color: #ffff00; }
+        #wrong-sounds h2 { color: #ff6b6b; } /* Rötlicher für Falsch */
+        #other-sounds h2 { color: #6495ed; }
+
+
+        .sound-button {
+            background-color: #333;
+            color: #e0e0e0;
+            border: 2px solid #555;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8em;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.2s, transform 0.1s;
+            width: 90%; /* Breite der Buttons */
+            display: flex;
+            justify-content: space-between; /* Text links, Zähler rechts */
+            align-items: center;
+        }
+
+        .sound-button:hover {
+            background-color: #444;
+        }
+
+        .sound-button:active {
+            background-color: #555;
+            transform: scale(0.98);
+        }
+
+        .button-label {
+            text-align: left;
+        }
+
+        .play-counter {
+            background-color: #1a1a1a;
+            color: #e6e364;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            min-width: 20px; /* Mindestbreite für den Zähler */
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Soundboard</h1>
+
+    <div class="soundboard-container">
+        <div class="column" id="right-sounds">
+            <h2>Richtig</h2>
+            <!-- Buttons werden hier per JS eingefügt -->
+        </div>
+
+        <div class="column" id="wrong-sounds">
+            <h2>Falsch</h2>
+            <!-- Buttons werden hier per JS eingefügt -->
+        </div>
+
+        <div class="column" id="other-sounds">
+            <h2>Leise &amp; Victory</h2>
+            <!-- Buttons werden hier per JS eingefügt -->
+        </div>
+    </div>
+
+    <script>
+        const soundsBasePath = 'sounds/';
+        const SOUND_FILE_EXTENSION = '.mp3';
+
+        // Konfiguration deiner Sounds
+        const soundCategories = [
+            { typeName: 'Richtig', folder: 'right', filePrefix: 'richtig', count: 29, containerId: 'right-sounds' },
+            { typeName: 'Falsch', folder: 'wrong', filePrefix: 'wrong', count: 26, containerId: 'wrong-sounds' },
+            { typeName: 'Leise', folder: 'leise', filePrefix: 'leise', count: 10, containerId: 'other-sounds' },
+            { typeName: 'Victory', folder: 'victory', filePrefix: 'victory', count: 3, containerId: 'other-sounds' }
+        ];
+
+        function padNumber(num, size) {
+            num = num.toString();
+            while (num.length < size) num = "0" + num;
+            return num;
+        }
+
+        function createSoundButton(category, soundNumber) {
+            const soundNumberPadded = padNumber(soundNumber, 5);
+            const soundFile = `${category.filePrefix}_${soundNumberPadded}${SOUND_FILE_EXTENSION}`;
+            const audioPath = `${soundsBasePath}${category.folder}/${soundFile}`;
+
+            const button = document.createElement('button');
+            button.classList.add('sound-button');
+            
+            const labelSpan = document.createElement('span');
+            labelSpan.classList.add('button-label');
+            labelSpan.textContent = `${category.typeName} #${soundNumber}`;
+            
+            const counterSpan = document.createElement('span');
+            counterSpan.classList.add('play-counter');
+            counterSpan.textContent = '0';
+
+            button.appendChild(labelSpan);
+            button.appendChild(counterSpan);
+
+            button.addEventListener('click', () => {
+                console.log(`Playing: ${audioPath}`);
+                const audio = new Audio(audioPath);
+                audio.play().catch(error => {
+                    console.error(`Fehler beim Abspielen von ${audioPath}:`, error);
+                    // Optional: Visuelles Feedback bei Fehler
+                });
+                
+                // Zähler erhöhen
+                let currentCount = parseInt(counterSpan.textContent);
+                counterSpan.textContent = currentCount + 1;
+            });
+
+            return button;
+        }
+
+        function populateSoundboard() {
+            soundCategories.forEach(category => {
+                const container = document.getElementById(category.containerId);
+                if (!container) {
+                    console.warn(`Container mit ID '${category.containerId}' nicht gefunden.`);
+                    return;
+                }
+
+                for (let i = 1; i <= category.count; i++) {
+                    const button = createSoundButton(category, i);
+                    container.appendChild(button);
+                }
+            });
+        }
+
+        // Soundboard beim Laden der Seite initialisieren
+        document.addEventListener('DOMContentLoaded', populateSoundboard);
+
+    </script>
+
+</body>
+</html>
