@@ -16,14 +16,12 @@
             text-align: center;
         }
 
-        /* H1 wurde entfernt */
-
         .soundboard-container {
             display: flex;
             justify-content: space-around;
             flex-wrap: wrap;
             gap: 20px;
-            margin-top: 20px; /* Etwas Abstand oben, da H1 weg ist */
+            margin-top: 20px;
         }
 
         .column {
@@ -93,7 +91,7 @@
             text-align: center;
         }
 
-        .column-separator { /* Für die Trennstriche */
+        .column-separator {
             border: 0;
             height: 1px;
             background-image: linear-gradient(to right, rgba(85, 85, 85, 0), rgba(85, 85, 85, 0.75), rgba(85, 85, 85, 0));
@@ -106,22 +104,17 @@
 </head>
 <body>
 
-    <!-- H1 wurde entfernt -->
-
     <div class="soundboard-container">
         <div class="column" id="right-sounds">
             <h2>Richtig</h2>
-            <!-- Buttons werden hier per JS eingefügt -->
         </div>
 
         <div class="column" id="wrong-sounds">
             <h2>Falsch</h2>
-            <!-- Buttons werden hier per JS eingefügt -->
         </div>
 
         <div class="column" id="other-sounds">
-            <h2>Diverse Sounds</h2> <!-- Titel angepasst -->
-            <!-- Buttons für Leise, Victory und Intro werden hier per JS eingefügt -->
+            <h2>Diverse Sounds</h2>
         </div>
     </div>
 
@@ -129,7 +122,9 @@
         const soundsBasePath = 'sounds/';
         const SOUND_FILE_EXTENSION = '.mp3';
 
-        // Struktur für die Anordnung und Kategorisierung der Sounds
+        // Globale Variable für das aktuell spielende Audio-Objekt
+        let currentlyPlayingAudio = null;
+
         const soundLayout = [
             {
                 containerId: 'right-sounds',
@@ -145,10 +140,11 @@
             },
             {
                 containerId: 'other-sounds',
-                categories: [ // Reihenfolge hier bestimmt die Anordnung in der Spalte
+                categories: [
                     { typeName: 'Leise', folder: 'leise', filePrefix: 'leise', count: 10 },
                     { typeName: 'Victory', folder: 'victory', filePrefix: 'victory', count: 3 },
-                    { typeName: 'Intro', folder: 'intros', filePrefix: 'intro', count: 6 } // Großes 'I' bei filePrefix, wie in "Intro_00001.mp3"
+                    // KORREKTUR: filePrefix für Intro auf kleines "i" geändert
+                    { typeName: 'Intro', folder: 'intros', filePrefix: 'intro', count: 6 }
                 ]
             }
         ];
@@ -159,9 +155,47 @@
             return num;
         }
 
+        function playSound(audioPath, button) {
+            // Stoppe den aktuell spielenden Sound, falls vorhanden
+            if (currentlyPlayingAudio) {
+                currentlyPlayingAudio.pause();
+                currentlyPlayingAudio.currentTime = 0; // Zurücksetzen
+                console.log("Vorheriger Sound gestoppt.");
+            }
+
+            console.log(`Playing: ${audioPath}`);
+            const newAudio = new Audio(audioPath);
+
+            newAudio.play().then(() => {
+                currentlyPlayingAudio = newAudio; // Setze den neuen Sound als aktuell spielend
+
+                // Zähler erhöhen, nur wenn der Button übergeben wurde (d.h. kein automatisches Stoppen)
+                if (button) {
+                    const counterSpan = button.querySelector('.play-counter');
+                    if (counterSpan) {
+                        let currentCount = parseInt(counterSpan.textContent);
+                        counterSpan.textContent = currentCount + 1;
+                    }
+                }
+            }).catch(error => {
+                console.error(`Fehler beim Abspielen von ${audioPath}:`, error);
+                if (currentlyPlayingAudio === newAudio) { // Nur löschen, wenn es dieser fehlerhafte Sound war
+                    currentlyPlayingAudio = null;
+                }
+            });
+
+            // Event-Listener, um currentlyPlayingAudio zu nullen, wenn der Sound natürlich endet
+            newAudio.onended = function() {
+                if (currentlyPlayingAudio === newAudio) {
+                    currentlyPlayingAudio = null;
+                    console.log(`Sound ${audioPath} natürlich beendet.`);
+                }
+            };
+        }
+
+
         function createSoundButton(categoryDetails, soundNumber) {
             const soundNumberPadded = padNumber(soundNumber, 5);
-            // categoryDetails enthält jetzt folder, filePrefix, typeName
             const soundFile = `${categoryDetails.filePrefix}_${soundNumberPadded}${SOUND_FILE_EXTENSION}`;
             const audioPath = `${soundsBasePath}${categoryDetails.folder}/${soundFile}`;
 
@@ -180,14 +214,7 @@
             button.appendChild(counterSpan);
 
             button.addEventListener('click', () => {
-                console.log(`Playing: ${audioPath}`);
-                const audio = new Audio(audioPath);
-                audio.play().catch(error => {
-                    console.error(`Fehler beim Abspielen von ${audioPath}:`, error);
-                });
-
-                let currentCount = parseInt(counterSpan.textContent);
-                counterSpan.textContent = currentCount + 1;
+                playSound(audioPath, button); // Übergib den Button an playSound für den Zähler
             });
 
             return button;
@@ -208,7 +235,6 @@
                 }
 
                 layoutGroup.categories.forEach((category, categoryIndex) => {
-                    // Füge einen Trennstrich hinzu, wenn es nicht die erste Kategorie in dieser Spalte ist
                     if (categoryIndex > 0) {
                         addSeparatorToColumn(container);
                     }
